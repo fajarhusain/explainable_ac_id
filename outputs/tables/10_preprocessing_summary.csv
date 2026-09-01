@@ -1,0 +1,10 @@
+Langkah,Detail
+A. Data mentah dimuat,1923 baris x 15 kolom
+B. Normalisasi Merek,98 -> 63 unique
+C. Parse numerik (5 kolom + Biaya),100% sukses (6/6 kolom)
+D. Parse tanggal (0000-00-00 -> NaT),1 nilai 0000-00-00 -> NaT; 1458 missing dipertahankan
+"E. Missing values (dipertahankan, tidak diimputasi)",Tanggal SHE: 75.82% | LSPro: 57.88%
+"F. Duplikat No. Reg (di-flag, tidak dihapus)",723 records duplikat (182 No. Reg unik)
+"G. Outlier (di-flag, tidak dihapus)",14 multi-model | 28 biaya | 1 daya
+H. Feature engineering (8 fitur baru),"EER_calc, Kategori_PK, tarif_calc, EER_diff, SHE_status, dll."
+I. Data bersih disimpan,data/processed/ac_simebtke_clean.csv (1923 x 29)

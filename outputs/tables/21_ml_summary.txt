@@ -1,0 +1,30 @@
+
+1. CLUSTERING (K-Means, k=5)
+   - Silhouette score: 0.5186
+   - 5 cluster terbentuk dengan profil:
+     Cluster 0: Sedang-Kurang Efisien (n=593)
+     Cluster 1: Besar-Efisien (n=281)
+     Cluster 2: Sedang-Efisien (n=825)
+     Cluster 3: Besar-Kurang Efisien (n=208)
+     Cluster 4: Besar-Kurang Efisien (n=2)
+
+2. KLASIFIKASI RATING BINTANG
+   - Best model: Random Forest
+   - Test Accuracy: 0.6675
+   - Test F1 (weighted): 0.6411
+   - CV F1: 0.5937 ± 0.0188
+   - [ASEMSI] Akurasi moderat karena prediktor (Daya, Kapasitas, Tipe) tidak
+     sepenuhnya menentukan Rating. EER/CSPF dikecualikan untuk mencegah leakage.
+
+3. REGRESI EER/CSPF
+   - Best model: Gradient Boosting
+   - Test R2: 0.2245
+   - Test RMSE: 3.7549
+   - Test MAE: 2.9865
+   - [ASEMSI] R2 rendah karena EER/CSPF ditentukan oleh faktor teknis internal
+     (kompresor, refrigeran, desain) yang tidak tersedia dalam dataset.
+
+4. DATA LEAKAGE PREVENTION
+   - Klasifikasi: prediktor = Daya, Kapasitas, Tipe, Kategori_PK (tanpa EER/CSPF, Konsumsi, Biaya)
+   - Regresi: prediktor = Daya, Kapasitas, Tipe, Kategori_PK (tanpa Konsumsi, Biaya, Rating)
+   - Semua derived variables dikecualikan dari prediktor

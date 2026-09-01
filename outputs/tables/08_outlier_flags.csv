@@ -1,0 +1,7 @@
+Kolom,Metode,Flag,Jumlah
+Daya (watt),IQR 1.5x,outlier_daya,19
+Kapasitas Pendinginan (BTU/h),IQR 1.5x,outlier_kapasitas,6
+Konsumsi Energi Tahunan (kWh),IQR 1.5x,outlier_konsumsi,32
+Biaya Listrik Tahunan (Rp),IQR 1.5x,outlier_biaya,34
+Biaya Listrik Tahunan (Rp),"Domain rule (0 / 99,999,999.99)",is_suspicious_biaya,28
+Daya (watt),Domain rule (<10W),is_suspicious_daya,1

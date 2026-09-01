@@ -1,0 +1,626 @@
+import json
+
+cells = []
+
+def md(source):
+    cells.append({
+        "cell_type": "markdown",
+        "id": f"md_{len(cells)}",
+        "metadata": {},
+        "source": source if isinstance(source, list) else [source],
+    })
+
+def code(source):
+    cells.append({
+        "cell_type": "code",
+        "id": f"code_{len(cells)}",
+        "metadata": {},
+        "source": source if isinstance(source, list) else [source],
+        "outputs": [],
+        "execution_count": None,
+    })
+
+# ============================================================
+md([
+    "# Tahap 1: Data Understanding & Exploratory Data Analysis (EDA)\n",
+    "## Dataset: Produk Pengondisi Udara (AC) - SIMEBTKE Kementerian ESDM Indonesia\n",
+    "\n",
+    "**Sumber:** https://simebtke.esdm.go.id/sinergi/skem-label/konsumen/pengondisi-udara-ac  \n",
+    "**Tujuan:** Identifikasi pola efisiensi energi AC di Indonesia  \n",
+    "\n",
+    "### Aturan Penelitian\n",
+    "1. Tidak mengubah data mentah\n",
+    "2. Salinan dataframe sebelum preprocessing\n",
+    "3. Tidak menghapus data tanpa alasan\n",
+    "4. Identifikasi missing value sebelum imputasi\n",
+    "5. Identifikasi kemungkinan data leakage\n",
+    "6. Tidak membuat kesimpulan sebelum melihat hasil\n",
+    "7. Tidak mengarang nilai atau pola\n",
+    "8. Semua transformasi dapat direproduksi\n",
+    "9. Visualisasi sesuai untuk publikasi ilmiah\n",
+    "10. Interpretasi statistik setelah analisis penting\n",
+    "11. Tandai setiap asumsi\n",
+    "12. Simpan preprocessing ke `data/processed`\n",
+    "13. Simpan grafik ke `outputs/figures`\n",
+    "14. Simpan tabel analisis ke `outputs/tables`"
+])
+
+# ============================================================
+md(["## 0. Setup & Konfigurasi"])
+
+code([
+    "import os\n",
+    "import warnings\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from scipy import stats\n",
+    "\n",
+    "warnings.filterwarnings('ignore')\n",
+    "pd.set_option('display.max_columns', None)\n",
+    "pd.set_option('display.max_rows', 100)\n",
+    "pd.set_option('display.width', 200)\n",
+    "pd.set_option('display.float_format', lambda x: f'{x:.4f}')\n",
+    "\n",
+    "sns.set_style('whitegrid')\n",
+    "plt.rcParams.update({\n",
+    "    'figure.dpi': 100,\n",
+    "    'savefig.dpi': 300,\n",
+    "    'font.size': 10,\n",
+    "    'axes.titlesize': 12,\n",
+    "    'axes.labelsize': 10,\n",
+    "    'figure.facecolor': 'white',\n",
+    "})\n",
+    "\n",
+    "for d in ['data/raw', 'data/processed', 'outputs/figures', 'outputs/tables']:\n",
+    "    os.makedirs(d, exist_ok=True)\n",
+    "\n",
+    "RAW_PATH = 'data/raw/ac_simebtke_raw.csv'\n",
+    "print('Setup selesai.')"
+])
+
+# ============================================================
+md(["## A. Load Dataset\n",
+    "\n",
+    "**Aturan 1 & 2:** Tidak mengubah data mentah; buat salinan sebelum preprocessing.\n",
+    "\n",
+    "**[ASEMSI]** Dataset dibaca dengan `dtype=str` untuk preservasi format mentah. Data asli di-fetch dari endpoint AJAX SIMEBTKE (lihat `fetch_data.py`)."])
+
+code([
+    "df_raw = pd.read_csv(RAW_PATH, dtype=str, encoding='utf-8-sig')\n",
+    "n_rows_raw, n_cols_raw = df_raw.shape\n",
+    "print(f'File: {RAW_PATH}')\n",
+    "print(f'Loaded {n_rows_raw} baris x {n_cols_raw} kolom')\n",
+    "\n",
+    "df = df_raw.copy()"
+])
+
+# ============================================================
+md(["## B. Shape Dataset"])
+
+code([
+    "print(f'Jumlah baris : {df.shape[0]}')\n",
+    "print(f'Jumlah kolom : {df.shape[1]}')"
+])
+
+# ============================================================
+md(["## C. Nama dan Tipe Kolom\n",
+    "\n",
+    "**[ASEMSI]** Semua kolom terbaca sebagai `str` karena `dtype=str` saat loading."])
+
+code([
+    "print(df.dtypes.to_string())\n",
+    "print(f\"\\nTotal kolom object/string: {(df.dtypes == 'object').sum()}\")"
+])
+
+# ============================================================
+md(["## D. 10 Baris Pertama"])
+
+code(["df.head(10)"])
+
+# ============================================================
+md(["## E. Missing Values\n",
+    "\n",
+    "Identifikasi missing value sebelum imputasi (aturan 4)."])
+
+code([
+    "for_missing = df.replace(['', 'null', 'NA', 'N/A', 'nan', 'None', '-'], np.nan)\n",
+    "missing_count = for_missing.isnull().sum()\n",
+    "missing_pct = (missing_count / len(for_missing) * 100).round(2)\n",
+    "missing_df = pd.DataFrame({\n",
+    "    'Jumlah Missing': missing_count,\n",
+    "    'Persentase (%)': missing_pct,\n",
+    "}).sort_values('Jumlah Missing', ascending=False)\n",
+    "missing_df = missing_df[missing_df['Jumlah Missing'] > 0]\n",
+    "missing_df\n",
+    "\n",
+    "missing_full = pd.DataFrame({\n",
+    "    'Jumlah Missing': for_missing.isnull().sum(),\n",
+    "    'Persentase (%)': (for_missing.isnull().sum() / len(for_missing) * 100).round(2),\n",
+    "})\n",
+    "missing_full.to_csv('outputs/tables/01_missing_values.csv')\n",
+    "print('Tersimpan: outputs/tables/01_missing_values.csv')"
+])
+
+# ============================================================
+md(["## F. Duplicate Rows"])
+
+code([
+    "dup_all = df.duplicated().sum()\n",
+    "cols_no_no = [c for c in df.columns if c != 'NO.']\n",
+    "dup_no_no = df[cols_no_no].duplicated().sum()\n",
+    "reg = df['No. Registrasi/No. SHE'].replace('', np.nan).dropna()\n",
+    "dup_reg = reg.duplicated().sum()\n",
+    "\n",
+    "print(f'Duplicate rows (semua kolom): {dup_all}')\n",
+    "print(f'Duplicate rows (tanpa NO.): {dup_no_no}')\n",
+    "print(f'Duplicate No. Registrasi/No. SHE: {dup_reg}')\n",
+    "\n",
+    "if dup_reg > 0:\n",
+    "    dups = df[df['No. Registrasi/No. SHE'].isin(reg[reg.duplicated()])].sort_values('No. Registrasi/No. SHE')\n",
+    "    print(f'\\nContoh duplikat No. Registrasi:')\n",
+    "    print(dups[['NO.', 'Merek', 'Model', 'No. Registrasi/No. SHE']].head(20).to_string())\n",
+    "\n",
+    "pd.DataFrame({\n",
+    "    'Tipe Duplikat': ['Semua kolom', 'Tanpa NO.', 'No. Registrasi/No. SHE'],\n",
+    "    'Jumlah': [dup_all, dup_no_no, dup_reg],\n",
+    "}).to_csv('outputs/tables/02_duplicates.csv', index=False)"
+])
+
+# ============================================================
+md(["## G. Unique Values - Kolom Kategorikal"])
+
+code([
+    "categorical_cols = ['Merek', 'Famili', 'Model', 'Tipe', 'Rating Bintang (1-5)', 'LSPro']\n",
+    "cat_summary = []\n",
+    "for col in categorical_cols:\n",
+    "    n_unique = df[col].nunique()\n",
+    "    cat_summary.append({'Kolom': col, 'Jumlah Unique': n_unique})\n",
+    "    print(f'\\n--- {col} ({n_unique} unique) ---')\n",
+    "    print(df[col].value_counts().head(10).to_string())\n",
+    "\n",
+    "pd.DataFrame(cat_summary).to_csv('outputs/tables/03_categorical_unique.csv', index=False)"
+])
+
+# ============================================================
+md(["## H. Format Angka pada Kolom Numerik\n",
+    "\n",
+    "Periksa apakah kolom numerik tersimpan sebagai string dengan karakter non-numerik (koma, 'Rp', 'W', 'BTU')."])
+
+code([
+    "numeric_cols = [\n",
+    "    'Daya (watt)',\n",
+    "    'Kapasitas Pendinginan (BTU/h)',\n",
+    "    'Nilai Efisiensi (EER/CSPF)',\n",
+    "    'Rating Bintang (1-5)',\n",
+    "    'Konsumsi Energi Tahunan (kWh)',\n",
+    "    'Biaya Listrik Tahunan (Rp)',\n",
+    "]\n",
+    "\n",
+    "for col in numeric_cols:\n",
+    "    print(f'\\n--- {col} ---')\n",
+    "    samples = df[col].dropna().unique()[:10]\n",
+    "    print(f'  Sample nilai mentah: {list(samples)}')\n",
+    "    has_comma = df[col].astype(str).str.contains(',', na=False).any()\n",
+    "    parsed_direct = pd.to_numeric(df[col], errors='coerce')\n",
+    "    n_parsed = parsed_direct.notna().sum()\n",
+    "    n_total = df[col].notna().sum()\n",
+    "    print(f'  Ada koma (,): {has_comma}')\n",
+    "    print(f'  Parse langsung berhasil: {n_parsed}/{n_total}')\n",
+    "\n",
+    "print('\\n[STRATEGI PARSING]')\n",
+    "print('Daya, Kapasitas, EER/CSPF, Rating, Konsumsi Energi: parse langsung')\n",
+    "print('Biaya Listrik: hapus koma thousand separator lalu parse')"
+])
+
+# ============================================================
+md(["## I. Format Tanggal"])
+
+code([
+    "date_cols = ['Tanggal Terbit SHE', 'SHE Berlaku Sampai Dengan Tanggal']\n",
+    "for col in date_cols:\n",
+    "    print(f'\\n--- {col} ---')\n",
+    "    non_null = df[col].replace('', np.nan).dropna()\n",
+    "    print(f'  Non-null: {len(non_null)}/{len(df)}')\n",
+    "    if len(non_null) > 0:\n",
+    "        samples = non_null.unique()[:10]\n",
+    "        print(f'  Sample: {list(samples)}')\n",
+    "        parsed = pd.to_datetime(non_null, format='%Y-%m-%d', errors='coerce')\n",
+    "        n_parsed = parsed.notna().sum()\n",
+    "        print(f'  Parse ISO (YYYY-MM-DD): {n_parsed}/{len(non_null)} berhasil')\n",
+    "        if n_parsed < len(non_null):\n",
+    "            unparseable = non_null[parsed.isna()].unique()[:10]\n",
+    "            print(f'  Tidak terparse: {list(unparseable)}')"
+])
+
+# ============================================================
+md(["## J. Identifikasi Nilai Tidak Wajar\n",
+    "\n",
+    "Parse numerik untuk inspeksi anomali (outlier, nilai 0, negatif, ekstrem)."])
+
+code([
+    "df_check = df.copy()\n",
+    "for col in ['Daya (watt)', 'Kapasitas Pendinginan (BTU/h)', 'Nilai Efisiensi (EER/CSPF)',\n",
+    "            'Konsumsi Energi Tahunan (kWh)']:\n",
+    "    df_check[col + '_num'] = pd.to_numeric(df_check[col], errors='coerce')\n",
+    "df_check['Biaya_num'] = pd.to_numeric(\n",
+    "    df_check['Biaya Listrik Tahunan (Rp)'].str.replace(',', '', regex=False), errors='coerce'\n",
+    ")\n",
+    "df_check['Rating_num'] = pd.to_numeric(df_check['Rating Bintang (1-5)'], errors='coerce')\n",
+    "\n",
+    "for label, col, unit in [\n",
+    "    ('Daya (watt)', 'Daya (watt)_num', 'W'),\n",
+    "    ('Kapasitas Pendinginan (BTU/h)', 'Kapasitas Pendinginan (BTU/h)_num', 'BTU/h'),\n",
+    "    ('Nilai Efisiensi (EER/CSPF)', 'Nilai Efisiensi (EER/CSPF)_num', ''),\n",
+    "    ('Konsumsi Energi Tahunan (kWh)', 'Konsumsi Energi Tahunan (kWh)_num', 'kWh'),\n",
+    "    ('Biaya Listrik Tahunan (Rp)', 'Biaya_num', 'Rp'),\n",
+    "]:\n",
+    "    data = df_check[col].dropna()\n",
+    "    print(f'\\n--- {label} ---')\n",
+    "    print(f'  Min: {data.min():.2f}, Max: {data.max():.2f}, Mean: {data.mean():.2f}')\n",
+    "    print(f'  Nilai 0: {(data == 0).sum()}, Nilai negatif: {(data < 0).sum()}')"
+])
+
+code([
+    "# Rating Bintang\n",
+    "rating = df_check['Rating_num'].dropna()\n",
+    "print(f'Rating Bintang: Min={rating.min()}, Max={rating.max()}')\n",
+    "print(f'Distribusi: {dict(rating.value_counts().sort_index())}')\n",
+    "print(f'Di luar rentang 1-5: {len(rating[(rating < 1) | (rating > 5)])}')"
+])
+
+code([
+    "# Daya tidak wajar\n",
+    "print('--- Daya < 100W ---')\n",
+    "print(df_check[df_check['Daya (watt)_num'] < 100][['NO.', 'Merek', 'Model', 'Daya (watt)']].to_string())\n",
+    "print('\\n--- Daya > 5000W ---')\n",
+    "print(df_check[df_check['Daya (watt)_num'] > 5000][['NO.', 'Merek', 'Model', 'Daya (watt)']].head(10).to_string())"
+])
+
+code([
+    "# Cross-check: EER = Kapasitas / Daya\n",
+    "df_check['EER_calc'] = df_check['Kapasitas Pendinginan (BTU/h)_num'] / df_check['Daya (watt)_num']\n",
+    "df_check['EER_diff'] = abs(df_check['EER_calc'] - df_check['Nilai Efisiensi (EER/CSPF)_num'])\n",
+    "noninv = df_check[df_check['Tipe'] == 'Non-Inverter']\n",
+    "eer_diff_noninv = noninv['EER_diff'].dropna()\n",
+    "print(f'Non-Inverter: median selisih EER terhitung vs tercatat = {eer_diff_noninv.median():.4f}')\n",
+    "print(f'Non-Inverter: max selisih = {eer_diff_noninv.max():.4f}')\n",
+    "inv = df_check[df_check['Tipe'] == 'Inverter']\n",
+    "eer_diff_inv = inv['EER_diff'].dropna()\n",
+    "print(f'Inverter: median selisih CSPF terhitung vs tercatat = {eer_diff_inv.median():.4f}')\n",
+    "print('[ASEMSI] Untuk Inverter, nilai efisiensi adalah CSPF (bukan EER).')\n",
+    "\n",
+    "# Cross-check: Biaya = Konsumsi * tarif\n",
+    "df_check['tarif_calc'] = df_check['Biaya_num'] / df_check['Konsumsi Energi Tahunan (kWh)_num']\n",
+    "tarif = df_check['tarif_calc'].dropna()\n",
+    "print(f'\\nTarif terhitung: min={tarif.min():.2f}, median={tarif.median():.2f}, max={tarif.max():.2f}')\n",
+    "print('[ASEMSI] Tarif listrik PLN non-subsidi ~Rp 1,444/kWh (2023).')"
+])
+
+# ============================================================
+md(["## K. Ringkasan Statistik Numerik"])
+
+code([
+    "df_numeric = pd.DataFrame()\n",
+    "df_numeric['Daya (watt)'] = pd.to_numeric(df['Daya (watt)'], errors='coerce')\n",
+    "df_numeric['Kapasitas Pendinginan (BTU/h)'] = pd.to_numeric(df['Kapasitas Pendinginan (BTU/h)'], errors='coerce')\n",
+    "df_numeric['Nilai Efisiensi (EER/CSPF)'] = pd.to_numeric(df['Nilai Efisiensi (EER/CSPF)'], errors='coerce')\n",
+    "df_numeric['Rating Bintang'] = pd.to_numeric(df['Rating Bintang (1-5)'], errors='coerce')\n",
+    "df_numeric['Konsumsi Energi Tahunan (kWh)'] = pd.to_numeric(df['Konsumsi Energi Tahunan (kWh)'], errors='coerce')\n",
+    "df_numeric['Biaya Listrik Tahunan (Rp)'] = pd.to_numeric(\n",
+    "    df['Biaya Listrik Tahunan (Rp)'].str.replace(',', '', regex=False), errors='coerce'\n",
+    ")\n",
+    "\n",
+    "desc = df_numeric.describe(include='all', percentiles=[.01, .05, .25, .5, .75, .95, .99]).T\n",
+    "desc['count_nonnull'] = df_numeric.count()\n",
+    "desc['missing'] = df_numeric.isnull().sum()\n",
+    "desc['missing_pct'] = (df_numeric.isnull().sum() / len(df_numeric) * 100).round(2)\n",
+    "desc\n",
+    "\n",
+    "desc.to_csv('outputs/tables/04_statistical_summary.csv')"
+])
+
+code([
+    "skew_kurt = pd.DataFrame({\n",
+    "    'Skewness': df_numeric.skew(numeric_only=True),\n",
+    "    'Kurtosis': df_numeric.kurtosis(numeric_only=True),\n",
+    "})\n",
+    "skew_kurt\n",
+    "\n",
+    "skew_kurt.to_csv('outputs/tables/05_skewness_kurtosis.csv')"
+])
+
+# ============================================================
+md(["## L. Visualisasi Awal"])
+
+md(["### L1. Histogram Variabel Numerik"])
+
+code([
+    "fig, axes = plt.subplots(2, 3, figsize=(16, 10))\n",
+    "fig.suptitle('Distribusi Variabel Numerik - Dataset AC SIMEBTKE', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "plot_cols = [\n",
+    "    ('Daya (watt)', 'Daya (watt)'),\n",
+    "    ('Kapasitas Pendinginan (BTU/h)', 'Kapasitas Pendingin (BTU/h)'),\n",
+    "    ('Nilai Efisiensi (EER/CSPF)', 'Nilai Efisiensi (EER/CSPF)'),\n",
+    "    ('Konsumsi Energi Tahunan (kWh)', 'Konsumsi Energi Tahunan (kWh)'),\n",
+    "    ('Biaya Listrik Tahunan (Rp)', 'Biaya Listrik Tahunan (Rp)'),\n",
+    "]\n",
+    "for idx, (col, label) in enumerate(plot_cols):\n",
+    "    ax = axes[idx // 3, idx % 3]\n",
+    "    data = df_numeric[col].dropna()\n",
+    "    ax.hist(data, bins=40, color='steelblue', edgecolor='white', alpha=0.8)\n",
+    "    ax.axvline(data.mean(), color='red', linestyle='--', linewidth=1.5, label=f'Mean={data.mean():.1f}')\n",
+    "    ax.axvline(data.median(), color='green', linestyle='--', linewidth=1.5, label=f'Median={data.median():.1f}')\n",
+    "    ax.set_xlabel(label)\n",
+    "    ax.set_ylabel('Frekuensi')\n",
+    "    ax.legend(fontsize=8)\n",
+    "\n",
+    "ax = axes[1, 2]\n",
+    "rating_counts = df_numeric['Rating Bintang'].dropna().value_counts().sort_index()\n",
+    "bars = ax.bar(rating_counts.index, rating_counts.values, color='coral', edgecolor='white')\n",
+    "ax.set_xlabel('Rating Bintang')\n",
+    "ax.set_ylabel('Frekuensi')\n",
+    "for bar, val in zip(bars, rating_counts.values):\n",
+    "    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5, str(val), ha='center', va='bottom', fontsize=9)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L1_histograms_numerik.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L2. Boxplot per Tipe (Inverter vs Non-Inverter)"])
+
+code([
+    "fig, axes = plt.subplots(2, 3, figsize=(16, 10))\n",
+    "fig.suptitle('Boxplot per Tipe AC - Inverter vs Non-Inverter', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "df_plot = df_numeric.copy()\n",
+    "df_plot['Tipe'] = df['Tipe'].values\n",
+    "\n",
+    "box_cols = [\n",
+    "    ('Daya (watt)', 'Daya (watt)'),\n",
+    "    ('Kapasitas Pendinginan (BTU/h)', 'Kapasitas (BTU/h)'),\n",
+    "    ('Nilai Efisiensi (EER/CSPF)', 'EER/CSPF'),\n",
+    "    ('Konsumsi Energi Tahunan (kWh)', 'Konsumsi (kWh)'),\n",
+    "    ('Biaya Listrik Tahunan (Rp)', 'Biaya (Rp)'),\n",
+    "    ('Rating Bintang', 'Rating Bintang'),\n",
+    "]\n",
+    "for idx, (col, label) in enumerate(box_cols):\n",
+    "    ax = axes[idx // 3, idx % 3]\n",
+    "    sns.boxplot(data=df_plot, x='Tipe', y=col, ax=ax, palette='Set2')\n",
+    "    ax.set_xlabel('')\n",
+    "    ax.set_ylabel(label)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L2_boxplot_per_tipe.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L3. Top 20 Merek"])
+
+code([
+    "fig, axes = plt.subplots(1, 2, figsize=(16, 7))\n",
+    "fig.suptitle('Top 20 Merek AC berdasarkan Jumlah Model Terdaftar', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "top_merek = df['Merek'].value_counts().head(20)\n",
+    "axes[0].barh(top_merek.index[::-1], top_merek.values[::-1], color='steelblue', edgecolor='white')\n",
+    "axes[0].set_xlabel('Jumlah Model')\n",
+    "axes[0].set_title('Top 20 Merek (Semua)')\n",
+    "\n",
+    "merek_tipe = df.groupby(['Merek', 'Tipe']).size().unstack(fill_value=0)\n",
+    "merek_tipe['Total'] = merek_tipe.sum(axis=1)\n",
+    "top_merek_tipe = merek_tipe.sort_values('Total', ascending=False).head(20).drop('Total', axis=1)\n",
+    "top_merek_tipe.plot(kind='barh', stacked=True, ax=axes[1], color=['steelblue', 'coral'])\n",
+    "axes[1].set_xlabel('Jumlah Model')\n",
+    "axes[1].set_title('Top 20 Merek (per Tipe)')\n",
+    "axes[1].legend(title='Tipe')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L3_top_merek.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L4. Distribusi Rating Bintang per Tipe"])
+
+code([
+    "fig, axes = plt.subplots(1, 2, figsize=(14, 6))\n",
+    "fig.suptitle('Distribusi Rating Bintang Hemat Energi', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "rating_tipe = df_plot.groupby(['Rating Bintang', 'Tipe']).size().unstack(fill_value=0)\n",
+    "rating_tipe.plot(kind='bar', ax=axes[0], color=['steelblue', 'coral'], edgecolor='white')\n",
+    "axes[0].set_xlabel('Rating Bintang')\n",
+    "axes[0].set_ylabel('Jumlah Model')\n",
+    "axes[0].set_title('Jumlah Model per Rating & Tipe')\n",
+    "axes[0].legend(title='Tipe')\n",
+    "\n",
+    "rating_pct = rating_tipe.div(rating_tipe.sum(axis=0), axis=1) * 100\n",
+    "rating_pct.plot(kind='bar', ax=axes[1], color=['steelblue', 'coral'], edgecolor='white')\n",
+    "axes[1].set_xlabel('Rating Bintang')\n",
+    "axes[1].set_ylabel('Persentase (%)')\n",
+    "axes[1].set_title('Proporsi Rating per Tipe')\n",
+    "axes[1].legend(title='Tipe')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L4_rating_per_tipe.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L5. Scatter: Daya vs Kapasitas & Efisiensi"])
+
+code([
+    "fig, axes = plt.subplots(1, 2, figsize=(16, 7))\n",
+    "fig.suptitle('Hubungan Daya, Kapasitas, dan Efisiensi', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "scatter_df = df_numeric.copy()\n",
+    "scatter_df['Tipe'] = df['Tipe'].values\n",
+    "scatter_df['Merek'] = df['Merek'].values\n",
+    "\n",
+    "sns.scatterplot(data=scatter_df, x='Daya (watt)', y='Kapasitas Pendinginan (BTU/h)',\n",
+    "                hue='Rating Bintang', style='Tipe', ax=axes[0], palette='RdYlGn', alpha=0.7, s=40)\n",
+    "axes[0].set_title('Daya vs Kapasitas Pendinginan')\n",
+    "\n",
+    "sns.scatterplot(data=scatter_df, x='Daya (watt)', y='Nilai Efisiensi (EER/CSPF)',\n",
+    "                hue='Rating Bintang', style='Tipe', ax=axes[1], palette='RdYlGn', alpha=0.7, s=40)\n",
+    "axes[1].set_title('Daya vs Nilai Efisiensi (EER/CSPF)')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L5_scatter_daya_kapasitas_eer.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L6. Correlation Heatmap"])
+
+code([
+    "fig, ax = plt.subplots(figsize=(10, 8))\n",
+    "corr = df_numeric.corr()\n",
+    "mask = np.triu(np.ones_like(corr, dtype=bool), k=1)\n",
+    "sns.heatmap(corr, mask=mask, annot=True, fmt='.3f', cmap='RdBu_r',\n",
+    "            center=0, vmin=-1, vmax=1, square=True, linewidths=0.5, ax=ax,\n",
+    "            cbar_kws={'label': 'Pearson r'})\n",
+    "ax.set_title('Korelasi Pearson antar Variabel Numerik', fontsize=13, fontweight='bold')\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L6_correlation_heatmap.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L7. Konsumsi Energi & Biaya per Rating Bintang"])
+
+code([
+    "fig, axes = plt.subplots(1, 2, figsize=(14, 6))\n",
+    "fig.suptitle('Efisiensi Energi & Biaya per Rating Bintang', fontsize=14, fontweight='bold')\n",
+    "\n",
+    "sns.boxplot(data=df_plot, x='Rating Bintang', y='Konsumsi Energi Tahunan (kWh)', ax=axes[0], palette='RdYlGn')\n",
+    "axes[0].set_title('Konsumsi Energi per Rating Bintang')\n",
+    "\n",
+    "sns.boxplot(data=df_plot, x='Rating Bintang', y='Biaya Listrik Tahunan (Rp)', ax=axes[1], palette='RdYlGn')\n",
+    "axes[1].set_title('Biaya Listrik per Rating Bintang')\n",
+    "axes[1].yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e6:.1f}M'))\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L7_konsumsi_biaya_per_rating.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+md(["### L8. Distribusi LSPro"])
+
+code([
+    "fig, ax = plt.subplots(figsize=(10, 6))\n",
+    "lspro_counts = df['LSPro'].replace('', np.nan).dropna().value_counts()\n",
+    "ax.barh(lspro_counts.index[::-1], lspro_counts.values[::-1], color='steelblue', edgecolor='white')\n",
+    "ax.set_xlabel('Jumlah Model')\n",
+    "ax.set_title('Distribusi Lembaga Sertifikasi (LSPro)', fontsize=13, fontweight='bold')\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('outputs/figures/L8_lspro_distribution.png', bbox_inches='tight')\n",
+    "plt.show()"
+])
+
+# ============================================================
+md(["## M. Machine Learning\n",
+    "\n",
+    "Tahap ini **TIDAK** melakukan machine learning. Fokus: data understanding dan EDA saja."])
+
+# ============================================================
+md(["## Simpan Data yang Sudah Diparse (Reproducible)\n",
+    "\n",
+    "Transformasi yang dapat direproduksi (aturan 8)."])
+
+code([
+    "df_processed = df.copy()\n",
+    "\n",
+    "for col in ['Daya (watt)', 'Kapasitas Pendinginan (BTU/h)', 'Nilai Efisiensi (EER/CSPF)',\n",
+    "            'Rating Bintang (1-5)', 'Konsumsi Energi Tahunan (kWh)']:\n",
+    "    df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')\n",
+    "\n",
+    "df_processed['Biaya Listrik Tahunan (Rp)'] = pd.to_numeric(\n",
+    "    df_processed['Biaya Listrik Tahunan (Rp)'].str.replace(',', '', regex=False), errors='coerce'\n",
+    ")\n",
+    "\n",
+    "for col in ['Tanggal Terbit SHE', 'SHE Berlaku Sampai Dengan Tanggal']:\n",
+    "    df_processed[col] = pd.to_datetime(df_processed[col], format='%Y-%m-%d', errors='coerce')\n",
+    "\n",
+    "df_processed.to_csv('data/processed/ac_simebtke_parsed.csv', index=False, encoding='utf-8-sig')\n",
+    "print(f'Disimpan: data/processed/ac_simebtke_parsed.csv ({df_processed.shape[0]} x {df_processed.shape[1]})')\n",
+    "print(df_processed.dtypes.to_string())"
+])
+
+# ============================================================
+md(["## Laporan Ringkasan Tahap 1\n",
+    "\n",
+    "### 1. Temuan Data Quality\n",
+    "\n",
+    "| Aspek | Temuan |\n",
+    "|-------|--------|\n",
+    "| **Shape** | 1923 baris x 15 kolom (623 Inverter + 1300 Non-Inverter) |\n",
+    "| **Tipe data** | Semua kolom string saat loading; perlu parse numerik & tanggal |\n",
+    "| **Missing values** | Tanggal Terbit SHE: 75.82% missing; SHE Berlaku: 75.82%; LSPro: 57.88% |\n",
+    "| **Duplicates** | 0 duplikat penuh; 10 duplikat tanpa NO.; **541 duplikat No. Registrasi/No. SHE** |\n",
+    "| **Format angka** | 5 kolom numerik bersih; **Biaya Listrik** menggunakan koma thousand separator (hanya 27/1923 terparse langsung) |\n",
+    "| **Format tanggal** | ISO YYYY-MM-DD; 1 nilai `0000-00-00` tidak valid |\n",
+    "| **Nilai tidak wajar** | Daya min=1.16W (BEKO), max=20,400W (Midea); Konsumsi max=5,040,796 kWh; Biaya max=Rp 99,999,999.99; Biaya=0 untuk 27 baris |\n",
+    "| **Konsistensi** | Tarif listrik terhitung median=Rp 1,444.71/kWh (konsisten dengan PLN); EER cross-check: Non-Inverter median selisih=0.21 (wajar) |\n",
+    "\n",
+    "### 2. Masalah yang Perlu Dibersihkan\n",
+    "\n",
+    "1. **Biaya Listrik Tahunan (Rp)** — koma thousand separator harus dihapus sebelum parse numerik\n",
+    "2. **541 duplikat No. Registrasi/No. SHE** — perlu investigasi: apakah model berbeda dengan No. SHE yang sama (batch registration)?\n",
+    "3. **Nilai `0000-00-00` pada Tanggal Terbit SHE** — harus diperlakukan sebagai missing\n",
+    "4. **Outlier ekstrem** — Daya >5,000W (9 baris, mayoritas Midea multi-model), Konsumsi Energi >1,000,000 kWh, Biaya=Rp 99,999,999.99\n",
+    "5. **Missing 75.82% pada kolom tanggal SHE** — kemungkinan data lama tidak memiliki SHE digital\n",
+    "6. **Case inconsistency pada Merek** — `Gree` (135) vs `GREE` (79) kemungkinan mere yang sama\n",
+    "7. **Famili vs Model** — 1781 vs 1789 unique; banyak baris memiliki Famili=Model identik\n",
+    "\n",
+    "### 3. Variabel yang Potensial Digunakan\n",
+    "\n",
+    "| Variabel | Tipe | Potensi |\n",
+    "|----------|------|---------|\n",
+    "| Daya (watt) | Numerik | Prediktor utama efisiensi |\n",
+    "| Kapasitas Pendinginan (BTU/h) | Numerik | Prediktor utama; korelasi kuat dengan Daya |\n",
+    "| Nilai Efisiensi (EER/CSPF) | Numerik | **Target/variabel dependen** untuk analisis efisiensi |\n",
+    "| Rating Bintang (1-5) | Ordinal | Target klasifikasi; proxy efisiensi |\n",
+    "| Konsumsi Energi Tahunan (kWh) | Numerik | Outcome variabel; derived dari EER & Daya |\n",
+    "| Biaya Listrik Tahunan (Rp) | Numerik | Derived dari Konsumsi x tarif (~Rp 1,444/kWh) |\n",
+    "| Tipe (Inverter/Non-Inverter) | Kategorikal | Variabel grouping penting; EER vs CSPF |\n",
+    "| Merek | Kategorikal | 98 unique; perlu normalisasi case (Gree vs GREE) |\n",
+    "| LSPro | Kategorikal | 5 unique; 57.88% missing |\n",
+    "\n",
+    "### 4. Potensi Data Leakage\n",
+    "\n",
+    "1. **Biaya Listrik Tahunan = Konsumsi Energi x Tarif** — korelasi hampir perfect; **JANGAN** gunakan keduanya sebagai prediktor独立 dalam model yang memprediksi salah satunya\n",
+    "2. **Konsumsi Energi Tahunan** derived dari EER/CSPF & Daya — jika target adalah EER/CSPF, maka Konsumsi Energi adalah **leakage**\n",
+    "3. **Rating Bintang** derived dari EER/CSPF (threshold-based) — jika memprediksi Rating, jangan gunakan EER/CSPF sebagai prediktor\n",
+    "4. **Famili = Model** pada banyak baris — identik secara informasi; hanya gunakan salah satu\n",
+    "\n",
+    "### 5. Analisis Lanjutan yang Disarankan\n",
+    "\n",
+    "1. **Data Cleaning**: normalisasi Merek (case), hapus koma pada Biaya, tangani `0000-00-00`, investigasi 541 duplikat No. SHE\n",
+    "2. **Analisis outlier**: tentukan threshold wajar Daya (mis. <5,000W untuk AC residential) dan flag outlier\n",
+    "3. **Segmentasi**: analisis terpisah Inverter (CSPF) vs Non-Inverter (EER) karena metrik efisiensi berbeda\n",
+    "4. **Korelasi mendalam**: uji korelasi parsial Daya-Kapasitas-EER setelah kontrol Tipe\n",
+    "5. **Feature engineering**: rasio Kapasitas/Daya (EER terhitung), kategori PK, klasifikasi efisiensi\n",
+    "6. **Visualisasi lanjutan**: pairplot per Tipe, violin plot per Merek, trend waktu (Tanggal Terbit SHE)\n",
+    "7. **Statistical testing**: ANOVA/Kruskal-Wallis untuk perbedaan EER antar Rating Bintang dan Tipe\n",
+    "8. **Clustering (unsupervised)**: kelompokkan AC berdasarkan profil Daya-Kapasitas-EER\n",
+    "9. **Klasifikasi**: prediksi Rating Bintang dari Daya + Kapasitas + Tipe (tanpa leakage)\n",
+    "10. **Regresi**: prediksi EER/CSPF dari Daya + Kapasitas + Tipe (tanpa Konsumsi/Biaya)"])
+
+# Build notebook
+nb = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3 (ipykernel)",
+            "language": "python",
+            "name": "python3",
+        },
+        "language_info": {"name": "python", "version": "3.x"},
+    },
+    "nbformat": 4,
+    "nbformat_minor": 5,
+}
+
+with open("/Users/fajarhusainasyari/explainable/explainable_ac.ipynb", "w", encoding="utf-8") as f:
+    json.dump(nb, f, ensure_ascii=False, indent=1)
+
+print(f"Notebook ditulis: {len(cells)} cells")

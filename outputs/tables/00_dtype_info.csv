@@ -1,0 +1,16 @@
+Kolom,Tipe_Data,Non_Null,Missing
+Merek,str,1923,0
+Famili,str,1923,0
+Model,str,1923,0
+Tipe,str,1923,0
+Daya (watt),float64,1923,0
+Kapasitas Pendinginan (BTU/h),float64,1923,0
+Nilai Efisiensi (EER/CSPF),float64,1923,0
+Rating Bintang (1-5),int64,1923,0
+Konsumsi Energi Tahunan (kWh),float64,1923,0
+Biaya Listrik Tahunan (Rp),float64,1923,0
+No. Registrasi/No. SHE,str,1923,0
+Tanggal Terbit SHE,datetime64[us],464,1459
+SHE Berlaku Sampai Dengan Tanggal,datetime64[us],465,1458
+NO.,str,1923,0
+LSPro,str,810,1113

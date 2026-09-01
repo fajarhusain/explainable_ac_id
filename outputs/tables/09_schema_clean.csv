@@ -1,0 +1,30 @@
+Kolom,Tipe,Non_Null,Missing,Missing_Pct,Kategori
+Merek,str,1923,0,0.0,Original
+Famili,str,1923,0,0.0,Original
+Model,str,1923,0,0.0,Original
+Tipe,str,1923,0,0.0,Original
+Daya (watt),float64,1923,0,0.0,Original
+Kapasitas Pendinginan (BTU/h),float64,1923,0,0.0,Original
+Nilai Efisiensi (EER/CSPF),float64,1923,0,0.0,Original
+Rating Bintang (1-5),int64,1923,0,0.0,Original
+Konsumsi Energi Tahunan (kWh),float64,1923,0,0.0,Original
+Biaya Listrik Tahunan (Rp),float64,1923,0,0.0,Original
+No. Registrasi/No. SHE,str,1923,0,0.0,Original
+Tanggal Terbit SHE,datetime64[us],464,1459,75.87,Original
+SHE Berlaku Sampai Dengan Tanggal,datetime64[us],465,1458,75.82,Original
+NO.,str,1923,0,0.0,Original
+LSPro,str,810,1113,57.88,Original
+is_duplicate_reg,bool,1923,0,0.0,Derived
+outlier_daya,int64,1923,0,0.0,Derived
+outlier_kapasitas,int64,1923,0,0.0,Derived
+outlier_konsumsi,int64,1923,0,0.0,Derived
+outlier_biaya,int64,1923,0,0.0,Derived
+is_multi_model_reg,int64,1923,0,0.0,Derived
+is_suspicious_biaya,int64,1923,0,0.0,Derived
+is_suspicious_daya,int64,1923,0,0.0,Derived
+EER_calc,float64,1923,0,0.0,Derived
+Kategori_PK,str,1923,0,0.0,Derived
+EER_per_PK,float64,1923,0,0.0,Derived
+tarif_calc,float64,1923,0,0.0,Derived
+EER_diff,float64,1923,0,0.0,Derived
+SHE_status,str,1923,0,0.0,Derived
